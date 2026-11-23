@@ -12,6 +12,13 @@
 #include "lv_png.h"
 #include "lodepng.h"
 #include <stdlib.h>
+#include <string.h>
+#if LV_USE_FS_FATFS && defined(LVGL_UI) && !defined(TREZOR_EMULATOR)
+#include "ff.h"
+#define LV_PNG_HEADER_CACHE_ENABLE 1
+#else
+#define LV_PNG_HEADER_CACHE_ENABLE 0
+#endif
 
 /*********************
  *      DEFINES
@@ -38,6 +45,82 @@ static void convert_color_depth(uint8_t * img, uint32_t px_cnt);
 /**********************
  *  STATIC VARIABLES
  **********************/
+#if LV_PNG_HEADER_CACHE_ENABLE
+#define PNG_HDR_CACHE_SIZE 256U
+#define PNG_HDR_CACHE_MASK (PNG_HDR_CACHE_SIZE - 1U)
+#define PNG_HDR_PATH_MAX   104U
+
+typedef struct {
+    uint32_t  gen;
+    lv_coord_t w;
+    lv_coord_t h;
+    char      path[PNG_HDR_PATH_MAX];
+} png_hdr_cache_entry_t;
+
+static png_hdr_cache_entry_t png_hdr_cache[PNG_HDR_CACHE_SIZE] __attribute__((section(".exram")));
+static uint32_t png_hdr_cache_inited = 0;
+
+static uint32_t png_hdr_hash(const char * s)
+{
+    uint32_t h = 2166136261U;
+    while(*s) {
+        h ^= (unsigned char)*s++;
+        h *= 16777619U;
+    }
+    return h;
+}
+
+static uint32_t png_hdr_cache_gen(const char * fn)
+{
+    if(fn[0] != LV_FS_FATFS_LETTER) return 0;
+    const char * path = fn + 1;
+    if(*path == ':') path++;
+    return ff_ro_cache_get_gen(path);
+}
+
+static bool png_hdr_cache_get(const char * fn, lv_coord_t * w, lv_coord_t * h)
+{
+    if(!png_hdr_cache_inited) return false;
+    uint32_t gen = png_hdr_cache_gen(fn);
+    if(gen == 0) return false;
+    uint32_t hash = png_hdr_hash(fn);
+    for(uint32_t i = 0; i < 8U; i++) {
+        const png_hdr_cache_entry_t * e = &png_hdr_cache[(hash + i) & PNG_HDR_CACHE_MASK];
+        if(e->gen != gen) return false;
+        if(strcmp(e->path, fn) == 0) {
+            *w = e->w;
+            *h = e->h;
+            return true;
+        }
+    }
+    return false;
+}
+
+static void png_hdr_cache_put(const char * fn, lv_coord_t w, lv_coord_t h)
+{
+    size_t len = strlen(fn);
+    if(len == 0 || len >= PNG_HDR_PATH_MAX) return;
+    uint32_t gen = png_hdr_cache_gen(fn);
+    if(gen == 0) return;
+    if(!png_hdr_cache_inited) {
+        memset(png_hdr_cache, 0, sizeof(png_hdr_cache));
+        png_hdr_cache_inited = 1;
+    }
+    uint32_t hash = png_hdr_hash(fn);
+    uint32_t slot = hash & PNG_HDR_CACHE_MASK;
+    for(uint32_t i = 0; i < 8U; i++) {
+        uint32_t idx = (hash + i) & PNG_HDR_CACHE_MASK;
+        if(png_hdr_cache[idx].gen != gen || strcmp(png_hdr_cache[idx].path, fn) == 0) {
+            slot = idx;
+            break;
+        }
+    }
+    png_hdr_cache[slot].gen = gen;
+    png_hdr_cache[slot].w = w;
+    png_hdr_cache[slot].h = h;
+    memcpy(png_hdr_cache[slot].path, fn, len + 1U);
+}
+#endif
 
 /**********************
  *      MACROS
@@ -77,7 +160,16 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t * decoder, const void * sr
     if(src_type == LV_IMG_SRC_FILE) {
         const char * fn = src;
         if(strcmp(lv_fs_get_ext(fn), "png") == 0) {              /*Check the extension*/
-
+#if LV_PNG_HEADER_CACHE_ENABLE
+            lv_coord_t cached_w = 0, cached_h = 0;
+            if(png_hdr_cache_get(fn, &cached_w, &cached_h)) {
+                header->always_zero = 0;
+                header->cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+                header->w = cached_w;
+                header->h = cached_h;
+                return LV_RES_OK;
+            }
+#endif
             /* Read the width and height from the file. They have a constant location:
              * [16..23]: width
              * [24..27]: height
@@ -101,6 +193,9 @@ static lv_res_t decoder_info(struct _lv_img_decoder_t * decoder, const void * sr
             /*The width and height are stored in Big endian format so convert them to little endian*/
             header->w = (lv_coord_t)((size[0] & 0xff000000) >> 24) + ((size[0] & 0x00ff0000) >> 8);
             header->h = (lv_coord_t)((size[1] & 0xff000000) >> 24) + ((size[1] & 0x00ff0000) >> 8);
+#if LV_PNG_HEADER_CACHE_ENABLE
+            png_hdr_cache_put(fn, header->w, header->h);
+#endif
 
             return LV_RES_OK;
         }

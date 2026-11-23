@@ -339,6 +339,7 @@ static void lodepng_set32bitInt(unsigned char* buffer, unsigned value) {
 
 #ifdef LODEPNG_COMPILE_DISK
 
+#ifdef LODEPNG_COMPILE_CPP
 /* returns negative value on error. This should be pure C compatible, so no fstat. */
 static long lodepng_filesize(const char* filename) {
     lv_fs_file_t f;
@@ -368,16 +369,47 @@ static unsigned lodepng_buffer_file(unsigned char* out, size_t size, const char*
     lv_fs_close(&f);
     return 0;
 }
+#endif
 
 unsigned lodepng_load_file(unsigned char** out, size_t* outsize, const char* filename) {
-  long size = lodepng_filesize(filename);
-  if(size < 0) return 78;
+  lv_fs_file_t f;
+  lv_fs_res_t res = lv_fs_open(&f, filename, LV_FS_MODE_RD);
+  if(res != LV_FS_RES_OK) return 78;
+
+  uint32_t size = 0;
+  if(lv_fs_seek(&f, 0, LV_FS_SEEK_END) != LV_FS_RES_OK) {
+    lv_fs_close(&f);
+    return 78;
+  }
+  if(lv_fs_tell(&f, &size) != LV_FS_RES_OK) {
+    lv_fs_close(&f);
+    return 78;
+  }
+  if(lv_fs_seek(&f, 0, LV_FS_SEEK_SET) != LV_FS_RES_OK) {
+    lv_fs_close(&f);
+    return 78;
+  }
+
   *outsize = (size_t)size;
-
   *out = (unsigned char*)lodepng_malloc((size_t)size);
-  if(!(*out) && size > 0) return 83; /*the above malloc failed*/
+  if(!(*out) && size > 0) {
+    lv_fs_close(&f);
+    return 83; /*the above malloc failed*/
+  }
 
-  return lodepng_buffer_file(*out, (size_t)size, filename);
+  if(size > 0) {
+    uint32_t br = 0;
+    res = lv_fs_read(&f, *out, size, &br);
+    lv_fs_close(&f);
+    if(res != LV_FS_RES_OK || br != size) {
+      lodepng_free(*out);
+      *out = NULL;
+      return 78;
+    }
+  } else {
+    lv_fs_close(&f);
+  }
+  return 0;
 }
 
 /*write given buffer to the file, overwriting the file, it doesn't append to it.*/
