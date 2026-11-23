@@ -259,6 +259,13 @@ bool lv_btnmatrix_get_popovers(const lv_obj_t * obj)
     return keyboard->popovers;
 }
 
+bool lv_keyboard_has_btn_ctrl(const lv_obj_t * obj, uint16_t btn_id, lv_btnmatrix_ctrl_t ctrl)
+{
+    LV_ASSERT_OBJ(obj, MY_CLASS);
+    lv_keyboard_t * keyboard = (lv_keyboard_t *)obj;
+    return lv_btnmatrix_has_btn_ctrl((lv_obj_t *)&(keyboard->btnm), btn_id, ctrl);
+}
+
 /*=====================
  * Other functions
  *====================*/
@@ -377,7 +384,7 @@ static void lv_keyboard_constructor(const lv_obj_class_t * class_p, lv_obj_t * o
 
     lv_keyboard_t * keyboard = (lv_keyboard_t *)obj;
     keyboard->ta         = NULL;
-    keyboard->mode       = LV_KEYBOARD_MODE_TEXT_LOWER;
+    keyboard->mode       = LV_KEYBOARD_MODE_USER_1;
     keyboard->popovers   = 0;
 
     lv_obj_align(obj, LV_ALIGN_BOTTOM_MID, 0, 0);

@@ -15,6 +15,10 @@
  *      DEFINES
  *********************/
 #define MY_CLASS &lv_qrcode_class
+#ifndef MAX_QRCODE_SIZE
+#define MAX_QRCODE_SIZE 440
+#endif
+#define BUFFER_SIZE (LV_CANVAS_BUF_SIZE_INDEXED_1BIT(MAX_QRCODE_SIZE, MAX_QRCODE_SIZE))
 
 /**********************
  *      TYPEDEFS
@@ -192,10 +196,13 @@ static void lv_qrcode_constructor(const lv_obj_class_t * class_p, lv_obj_t * obj
 {
     LV_UNUSED(class_p);
 
-    uint32_t buf_size = LV_CANVAS_BUF_SIZE_INDEXED_1BIT(size_param, size_param);
-    uint8_t * buf = lv_mem_alloc(buf_size);
-    LV_ASSERT_MALLOC(buf);
-    if(buf == NULL) return;
+    // uint32_t buf_size = LV_CANVAS_BUF_SIZE_INDEXED_1BIT(size_param, size_param);
+    // uint8_t * buf = lv_mem_alloc(buf_size);
+    // LV_ASSERT_MALLOC(buf);
+    // if(buf == NULL) return;
+    static uint8_t buf[BUFFER_SIZE] __attribute__((section(".qrcode_buf")));
+    // LV_ASSERT_MALLOC(buf);
+    // if(buf == NULL) return;
 
     lv_canvas_set_buffer(obj, buf, size_param, size_param, LV_IMG_CF_INDEXED_1BIT);
     lv_canvas_set_palette(obj, 0, dark_color_param);
@@ -208,7 +215,7 @@ static void lv_qrcode_destructor(const lv_obj_class_t * class_p, lv_obj_t * obj)
 
     lv_img_dsc_t * img = lv_canvas_get_img(obj);
     lv_img_cache_invalidate_src(img);
-    lv_mem_free((void *)img->data);
+    // lv_mem_free((void *)img->data);
     img->data = NULL;
 }
 

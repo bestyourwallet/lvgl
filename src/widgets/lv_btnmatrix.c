@@ -426,8 +426,7 @@ static void lv_btnmatrix_event(const lv_obj_class_t * class_p, lv_event_t * e)
             btn_pr = get_button_from_point(obj, &p);
             /*Handle the case where there is no button there*/
             if(btn_pr != LV_BTNMATRIX_BTN_NONE) {
-                if(button_is_inactive(btnm->ctrl_bits[btn_pr]) == false &&
-                   button_is_hidden(btnm->ctrl_bits[btn_pr]) == false) {
+                if(button_is_hidden(btnm->ctrl_bits[btn_pr]) == false) {
                     btnm->btn_id_sel = btn_pr;
                     invalidate_button_area(obj, btnm->btn_id_sel); /*Invalidate the new area*/
                 }
@@ -761,10 +760,21 @@ static void draw_main(lv_event_t * e)
         }
 
         lv_coord_t btn_height = lv_area_get_height(&btn_area);
-
-        if((btn_state & LV_STATE_PRESSED) && (btnm->ctrl_bits[btn_i] & LV_BTNMATRIX_CTRL_POPOVER)) {
+        /*If 12 buttons and hss 3x4 layout, assumed it is number keyboard*/
+        bool is_num_kb =
+            (btnm->btn_cnt == 12 && btnm->row_cnt == 4) ? true : false;
+        if ((btn_state & LV_STATE_PRESSED) &&
+            (btnm->ctrl_bits[btn_i] & LV_BTNMATRIX_CTRL_POPOVER)) {
+          if (!is_num_kb) {
             /*Push up the upper boundary of the btn area to create the popover*/
-            btn_area.y1 -= btn_height;
+            btn_area.y1 -= btn_height + 2;
+          } else {
+            /*shrink around*/
+            btn_area.x1 += 2;
+            btn_area.y1 += 2;
+            btn_area.x2 -= 2;
+            btn_area.y2 -= 2;
+          }
         }
 
         /*Draw the background*/
@@ -793,10 +803,12 @@ static void draw_main(lv_event_t * e)
         btn_area.x2 = btn_area.x1 + txt_size.x;
         btn_area.y2 = btn_area.y1 + txt_size.y;
 
-        if((btn_state & LV_STATE_PRESSED) && (btnm->ctrl_bits[btn_i] & LV_BTNMATRIX_CTRL_POPOVER)) {
-            /*Push up the button text into the popover*/
-            btn_area.y1 -= btn_height / 2;
-            btn_area.y2 -= btn_height / 2;
+        if ((btn_state & LV_STATE_PRESSED) &&
+            (btnm->ctrl_bits[btn_i] & LV_BTNMATRIX_CTRL_POPOVER) &&
+            !is_num_kb) {
+          /*Push up the button text into the popover*/
+          btn_area.y1 -= btn_height / 2;
+          btn_area.y2 -= btn_height / 2;
         }
 
         /*Draw the text*/

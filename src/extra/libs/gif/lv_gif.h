@@ -44,7 +44,9 @@ extern const lv_obj_class_t lv_gif_class;
 lv_obj_t * lv_gif_create(lv_obj_t * parent);
 void lv_gif_set_src(lv_obj_t * obj, const void * src);
 void lv_gif_restart(lv_obj_t * gif);
-
+void lv_gif_set_loop_count(lv_obj_t * obj, int32_t count);
+void lv_gif_pause(lv_obj_t * obj);
+void lv_gif_resume(lv_obj_t * obj);
 /**********************
  *      MACROS
  **********************/

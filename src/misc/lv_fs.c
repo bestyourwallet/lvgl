@@ -12,6 +12,7 @@
 #include "lv_ll.h"
 #include <string.h>
 #include "lv_gc.h"
+#include "py/mpstate.h"
 
 /*********************
  *      DEFINES
@@ -93,6 +94,9 @@ lv_fs_res_t lv_fs_open(lv_fs_file_t * file_p, const char * path, lv_fs_mode_t mo
 
     if(drv->cache_size) {
         file_p->cache = lv_mem_alloc(sizeof(lv_fs_file_cache_t));
+        if (strstr(path, ".gif")) {
+            MP_STATE_PORT(mp_lv_gif_cache) = file_p->cache;
+        }
         LV_ASSERT_MALLOC(file_p->cache);
         lv_memset_00(file_p->cache, sizeof(lv_fs_file_cache_t));
         file_p->cache->start = UINT32_MAX;  /*Set an invalid range by default*/
@@ -110,6 +114,10 @@ lv_fs_res_t lv_fs_close(lv_fs_file_t * file_p)
 
     if(file_p->drv->close_cb == NULL) {
         return LV_FS_RES_NOT_IMP;
+    }
+
+    if (MP_STATE_PORT(mp_lv_gif_cache) == file_p->cache) {
+        MP_STATE_PORT(mp_lv_gif_cache) = NULL;
     }
 
     lv_fs_res_t res = file_p->drv->close_cb(file_p->drv, file_p->file_d);

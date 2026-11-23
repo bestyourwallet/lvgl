@@ -7,9 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "py/mpstate.h"
 
-#define MIN(A, B) ((A) < (B) ? (A) : (B))
-#define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define lv_mem_alloc  lodepng_malloc
+#define lv_mem_realloc  lodepng_realloc
+#define lv_mem_free  lodepng_free
+
+// #define MIN(A, B) ((A) < (B) ? (A) : (B))
+// #define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 typedef struct Entry {
     uint16_t length;
@@ -617,7 +622,8 @@ static bool f_gif_open(gd_GIF * gif, const void * path, bool is_file)
     if(is_file) {
         lv_fs_res_t res = lv_fs_open(&gif->fd, path, LV_FS_MODE_RD);
         if(res != LV_FS_RES_OK) return false;
-        else return true;
+        MP_STATE_PORT(mp_fp) = gif->fd.file_d;
+        return true;
     } else {
         gif->data = path;
         return true;
@@ -653,6 +659,9 @@ static void f_gif_close(gd_GIF * gif)
 {
     if(gif->is_file) {
         lv_fs_close(&gif->fd);
+        if (MP_STATE_PORT(mp_fp) == gif->fd.file_d) {
+            MP_STATE_PORT(mp_fp) = NULL;
+        }
     }
 }
 

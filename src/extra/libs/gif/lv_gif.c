@@ -138,6 +138,7 @@ static void next_frame_task_cb(lv_timer_t * t)
         /*It was the last repeat*/
         if(gifobj->gif->loop_count == 1) {
             lv_res_t res = lv_event_send(obj, LV_EVENT_READY, NULL);
+            lv_timer_pause(t);
             if(res != LV_FS_RES_OK) return;
         }
         else {
@@ -150,6 +151,36 @@ static void next_frame_task_cb(lv_timer_t * t)
 
     lv_img_cache_invalidate_src(lv_img_get_src(obj));
     lv_obj_invalidate(obj);
+}
+
+void lv_gif_set_loop_count(lv_obj_t * obj, int32_t count)
+{
+    lv_gif_t * gifobj = (lv_gif_t *) obj;
+
+    if(gifobj->gif == NULL) {
+        LV_LOG_WARN("Gif resource not loaded correctly");
+        return;
+    }
+
+    gifobj->gif->loop_count = count;
+}
+
+void lv_gif_pause(lv_obj_t * obj)
+{
+    lv_gif_t * gifobj = (lv_gif_t *) obj;
+    lv_timer_pause(gifobj->timer);
+}
+
+void lv_gif_resume(lv_obj_t * obj)
+{
+    lv_gif_t * gifobj = (lv_gif_t *) obj;
+
+    if(gifobj->gif == NULL) {
+        LV_LOG_WARN("Gif resource not loaded correctly");
+        return;
+    }
+
+    lv_timer_resume(gifobj->timer);
 }
 
 #endif /*LV_USE_GIF*/
